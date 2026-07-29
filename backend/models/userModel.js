@@ -1,71 +1,84 @@
 /* =============================================================================
    models/userModel.js
-   In-memory data store for registered users.
-   Demonstrates Project 2 concept: simple in-memory storage using a plain array.
-   No database required — data persists while the server process is running.
+   Mongoose schema and model for the User resource.
+   Project 3: Database Integration | DecodeLabs Industrial Training 2026
+
+   Replaces the Project 2 in-memory array with a real MongoDB collection.
+   All data written through this model persists across server restarts.
+
+   Collection name (auto-derived by Mongoose): "users"
    ============================================================================= */
 
-/**
- * users – the in-memory array that holds all registered user records.
- * In a real application this would be replaced by a database (MongoDB, PostgreSQL, etc.)
- *
- * Example entry:
- * {
- *   id: 1,
- *   name: "Aisha",
- *   email: "aisha@example.com",
- *   createdAt: "2026-07-29T01:00:00.000Z"
- * }
- */
-let users = [];
+const mongoose = require('mongoose');
 
-/**
- * getAllUsers – returns the full list of users.
- *
- * @returns {Array} - Array of all user objects
- */
-function getAllUsers() {
-  return users;
-}
+/* ── Schema Definition ─────────────────────────────────────────────────────────
+   Each field includes type, validation, and constraints.
+   Mongoose enforces these rules at the application layer before hitting MongoDB.
+   The database-level unique index on email is enforced by MongoDB itself.
+   ──────────────────────────────────────────────────────────────────────────── */
 
-/**
- * findUserById – finds a single user by their numeric ID.
- *
- * @param {number} id - The user's ID
- * @returns {Object|undefined} - The user object, or undefined if not found
- */
-function findUserById(id) {
-  return users.find(u => u.id === id);
-}
+const userSchema = new mongoose.Schema(
+  {
+    // ── Name ────────────────────────────────────────────────────────────────
+    name: {
+      type    : String,
+      required: [true, 'Name is required.'],
+      trim    : true,
+      minlength: [2,   'Name must be at least 2 characters long.'],
+      maxlength: [100, 'Name must not exceed 100 characters.']
+    },
 
-/**
- * emailExists – checks whether an email address is already registered.
- * Comparison is case-insensitive.
- *
- * @param {string} email - Email address to check
- * @returns {boolean}
- */
-function emailExists(email) {
-  const normalised = email.trim().toLowerCase();
-  return users.some(u => u.email === normalised);
-}
+    // ── Email ───────────────────────────────────────────────────────────────
+    // unique: true creates a MongoDB unique index → database-level constraint.
+    // Duplicate inserts will throw a MongoServerError with code 11000.
+    email: {
+      type     : String,
+      required : [true, 'Email address is required.'],
+      unique   : true,          // Database-level unique constraint
+      lowercase: true,          // Normalise to lowercase before saving
+      trim     : true,
+      match    : [
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        'Please provide a valid email address.'
+      ]
+    },
 
-/**
- * createUser – adds a new user to the in-memory store.
- *
- * @param {Object} data - Must contain { name, email }
- * @returns {Object} - The newly created user record (with id & createdAt)
- */
-function createUser(data) {
-  const newUser = {
-    id        : users.length + 1,                  // Simple auto-increment ID
-    name      : data.name.trim(),
-    email     : data.email.trim().toLowerCase(),
-    createdAt : new Date().toISOString()            // ISO 8601 timestamp
-  };
+    // ── Role ─────────────────────────────────────────────────────────────────
+    // Enum validation — only 'user' or 'admin' are accepted values.
+    // This is a database-level check constraint equivalent.
+    role: {
+      type   : String,
+      enum   : {
+        values : ['user', 'admin'],
+        message: 'Role must be either "user" or "admin".'
+      },
+      default: 'user'
+    }
+  },
+  {
+    // ── Timestamps ──────────────────────────────────────────────────────────
+    // Mongoose automatically adds createdAt and updatedAt fields.
+    timestamps: true
+  }
+);
 
-  users.push(newUser);
-  return newUser;
-}
+/* ── Virtual: toJSON transform ─────────────────────────────────────────────────
+   Renames _id → id and removes __v from API responses for cleaner output.
+   ──────────────────────────────────────────────────────────────────────────── */
+userSchema.set('toJSON', {
+  virtuals: true,
+  transform(doc, ret) {
+    ret.id = ret._id;
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  }
+});
 
-module.exports = { getAllUsers, findUserById, emailExists, createUser };
+/* ── Model ─────────────────────────────────────────────────────────────────────
+   mongoose.model() creates or retrieves the compiled model.
+   The model name 'User' maps to the 'users' MongoDB collection.
+   ──────────────────────────────────────────────────────────────────────────── */
+const User = mongoose.model('User', userSchema);
+
+module.exports = User;

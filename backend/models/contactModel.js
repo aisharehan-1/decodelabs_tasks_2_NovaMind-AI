@@ -1,43 +1,74 @@
 /* =============================================================================
    models/contactModel.js
-   In-memory data store for contact form submissions.
-   Acts as a lightweight "database" during development (no DB required).
+   Mongoose schema and model for the Contact resource.
+   Project 3: Database Integration | DecodeLabs Industrial Training 2026
+
+   Replaces the Project 2 in-memory contacts array.
+   Submitted contact form data is now stored persistently in MongoDB.
+
+   Collection name (auto-derived): "contacts"
    ============================================================================= */
 
-/**
- * contacts – temporary in-memory array that holds all contact submissions.
- * Data persists only while the server process is running.
- * Replace with a real DB (MongoDB / PostgreSQL) for production use.
- */
-const contacts = [];
+const mongoose = require('mongoose');
 
-/**
- * addContact – appends a new contact entry to the in-memory store.
- *
- * @param {Object} data  - Validated contact data: { name, email, phone, message }
- * @returns {Object}     - The newly created contact record (with id & timestamp)
- */
-function addContact(data) {
-  const newContact = {
-    id        : contacts.length + 1,               // Simple auto-increment ID
-    name      : data.name.trim(),
-    email     : data.email.trim().toLowerCase(),
-    phone     : data.phone.trim(),
-    message   : data.message.trim(),
-    createdAt : new Date().toISOString()            // ISO 8601 timestamp
-  };
+/* ── Schema Definition ─────────────────────────────────────────────────────── */
 
-  contacts.push(newContact);
-  return newContact;
-}
+const contactSchema = new mongoose.Schema(
+  {
+    // ── Name ─────────────────────────────────────────────────────────────────
+    name: {
+      type     : String,
+      required : [true, 'Name is required.'],
+      trim     : true,
+      minlength: [2,    'Name must be at least 2 characters long.'],
+      maxlength: [100,  'Name must not exceed 100 characters.']
+    },
 
-/**
- * getAllContacts – retrieves every stored contact submission.
- *
- * @returns {Array} - Array of contact objects (newest last)
- */
-function getAllContacts() {
-  return contacts;
-}
+    // ── Email ─────────────────────────────────────────────────────────────────
+    email: {
+      type    : String,
+      required: [true, 'Email address is required.'],
+      lowercase: true,
+      trim    : true,
+      match   : [
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        'Please provide a valid email address.'
+      ]
+    },
 
-module.exports = { addContact, getAllContacts };
+    // ── Phone ─────────────────────────────────────────────────────────────────
+    phone: {
+      type    : String,
+      required: [true, 'Phone number is required.'],
+      trim    : true
+    },
+
+    // ── Message ───────────────────────────────────────────────────────────────
+    message: {
+      type     : String,
+      required : [true, 'Message is required.'],
+      trim     : true,
+      minlength: [10,   'Message must be at least 10 characters long.'],
+      maxlength: [2000, 'Message must not exceed 2000 characters.']
+    }
+  },
+  {
+    timestamps: true // Adds createdAt and updatedAt automatically
+  }
+);
+
+/* ── toJSON transform ──────────────────────────────────────────────────────── */
+contactSchema.set('toJSON', {
+  virtuals: true,
+  transform(doc, ret) {
+    ret.id = ret._id;
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  }
+});
+
+/* ── Model ─────────────────────────────────────────────────────────────────── */
+const Contact = mongoose.model('Contact', contactSchema);
+
+module.exports = Contact;

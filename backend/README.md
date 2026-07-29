@@ -1,8 +1,26 @@
-# NovaMind AI — Project 2: Backend API Development
+# NovaMind AI — Project 3: Database Integration
 
-> **RESTful API built with Node.js & Express.js**  
+> **RESTful API + MongoDB + Mongoose**  
 > DecodeLabs Industrial Training Kit | Batch 2026  
-> Designed to power the NovaMind AI Landing Page (Project 1)
+> Builds on Project 1 (Frontend) and Project 2 (Backend API)
+
+---
+
+## Project Overview
+
+NovaMind AI now uses **persistent database storage** powered by **MongoDB and Mongoose**.
+
+In Project 2, all data (users, contacts, newsletter subscribers) was stored in temporary in-memory JavaScript arrays. Every time the server restarted, all data was lost.
+
+**Project 3 eliminates this entirely:**
+
+- All user registrations are stored permanently in MongoDB.
+- All contact form submissions are stored permanently in MongoDB.
+- All newsletter subscriptions are stored permanently in MongoDB.
+- Data survives server restarts — proving genuine persistent storage.
+- Full CRUD (Create, Read, Update, Delete) is implemented for the User resource.
+- Database-level constraints enforce data integrity.
+- Mongoose schema validation provides application-level defence.
 
 ---
 
@@ -11,85 +29,226 @@
 ```
 NovaMind AI/
 │
-├── index.html                     ← Frontend (Project 1)
+├── index.html                        ← Frontend (Project 1)
 ├── css/
-│   └── style.css                  ← Frontend styles
+│   └── style.css                     ← Frontend styles
 ├── js/
-│   └── main.js                    ← Frontend JS — connects to backend via fetch()
-├── assets/                        ← Frontend images & media
+│   └── main.js                       ← Frontend JS — connects to backend via fetch()
+├── assets/                           ← Frontend images & media
 │
-└── backend/                       ← Project 2: Backend API
-    ├── server.js                  ← Entry point — sets up Express, middleware & routes
-    ├── package.json               ← Project metadata & npm dependencies
-    ├── README.md                  ← This file
+└── backend/                          ← Project 2 & 3: Backend API
+    ├── server.js                     ← Entry point — dotenv, connectDB, Express, routes
+    ├── package.json                  ← Dependencies: express, mongoose, dotenv, cors
+    ├── .env                          ← Environment variables (NOT in version control)
+    ├── .env.example                  ← Safe placeholder for version control
+    ├── README.md                     ← This file
+    │
+    ├── config/
+    │   └── database.js               ← MongoDB connection using Mongoose
+    │
+    ├── models/                       ← Mongoose schemas — database is source of truth
+    │   ├── userModel.js              ← User schema: name, email, role, timestamps
+    │   ├── contactModel.js           ← Contact schema: name, email, phone, message
+    │   ├── newsletterModel.js        ← Newsletter schema: email (unique), subscribedAt
+    │   └── authModel.js              ← Demo credentials store (kept from Project 2)
+    │
+    ├── controllers/                  ← Business logic (async/await + Mongoose)
+    │   ├── userController.js         ← Full CRUD: GET, POST, PUT, DELETE
+    │   ├── contactController.js      ← GET, POST (MongoDB-backed)
+    │   ├── newsletterController.js   ← GET, POST (MongoDB-backed, unique email)
+    │   └── authController.js         ← Demo login (kept from Project 2)
     │
     ├── routes/
-    │   ├── userRoutes.js          ← GET & POST /api/users  |  GET /api/users/:id
-    │   ├── contactRoutes.js       ← GET & POST /api/contact
-    │   ├── newsletterRoutes.js    ← GET & POST /api/newsletter
-    │   └── authRoutes.js          ← POST /api/login
-    │
-    ├── controllers/
-    │   ├── userController.js      ← Business logic for /api/users
-    │   ├── contactController.js   ← Business logic for /api/contact
-    │   ├── newsletterController.js← Business logic for /api/newsletter
-    │   └── authController.js      ← Business logic for /api/login
-    │
-    ├── models/
-    │   ├── userModel.js           ← In-memory users array ( let users = []; )
-    │   ├── contactModel.js        ← In-memory contact submissions store
-    │   ├── newsletterModel.js     ← In-memory newsletter subscriber store
-    │   └── authModel.js           ← Dummy user credentials store
+    │   ├── userRoutes.js             ← Full CRUD routes for /api/users
+    │   ├── contactRoutes.js          ← GET & POST /api/contact
+    │   ├── newsletterRoutes.js       ← GET & POST /api/newsletter
+    │   └── authRoutes.js             ← POST /api/login
     │
     └── middleware/
-        ├── requestLogger.js       ← Logs every request: method, URL, status & time
-        ├── errorHandler.js        ← Global 500 error catcher (4-arg Express middleware)
-        └── notFoundHandler.js     ← 404 handler for undefined API routes
+        ├── requestLogger.js          ← Logs method, URL, status, time
+        ├── errorHandler.js           ← Global error handler (Mongoose-aware)
+        └── notFoundHandler.js        ← 404 JSON handler
 ```
 
 ---
 
-## Technologies Used
+## Technologies
 
-| Technology     | Purpose                                       |
-|----------------|-----------------------------------------------|
-| Node.js        | JavaScript runtime environment                |
-| Express.js     | Web framework for routing & middleware        |
-| cors           | Cross-Origin Resource Sharing headers         |
-| express.json() | Parse incoming JSON request bodies            |
-| JavaScript     | Language for both frontend and backend        |
-| HTML & CSS     | Frontend (Project 1)                          |
-| nodemon        | Auto-restart server on file changes (dev)     |
+| Technology     | Version  | Purpose                                           |
+|----------------|----------|---------------------------------------------------|
+| Node.js        | v16+     | JavaScript runtime environment                    |
+| Express.js     | ^4.18.2  | Web framework for routing & middleware            |
+| MongoDB        | Atlas/Local | NoSQL database — persistent storage            |
+| Mongoose       | ^8.x     | ODM — schemas, validation, model methods          |
+| dotenv         | ^16.x    | Loads environment variables from .env             |
+| cors           | ^2.8.5   | Cross-Origin Resource Sharing headers             |
+| nodemon        | ^3.0.1   | Auto-restart server on file changes (dev)         |
 
 ---
 
-## Installation & Setup
+## Why MongoDB?
 
-### 1. Prerequisites
+MongoDB was selected because:
 
-Ensure the following are installed:
+1. **Natural fit with Node.js/Express** — JavaScript objects map directly to BSON documents without a separate ORM translation layer.
+2. **Mongoose ODM** — provides schemas, validation, hooks, and query methods on top of the native MongoDB driver.
+3. **Flexible document model** — ideal for the NovaMind AI data structures (user profiles, contact messages, newsletter subscriptions).
+4. **Cloud-ready** — MongoDB Atlas provides a free tier with zero server management.
+5. **Unique indexes** — MongoDB enforces `unique: true` constraints at the database engine level, not just the application layer.
+
+---
+
+## Database Collections & Schemas
+
+### Collection: `users`
+
+Stores registered user accounts.
+
+| Field       | Type   | Constraints                              |
+|-------------|--------|------------------------------------------|
+| `_id`       | ObjectId | Auto-generated primary key             |
+| `name`      | String | Required, minLength 2, maxLength 100     |
+| `email`     | String | Required, unique, lowercase, email format|
+| `role`      | String | Enum: `user` \| `admin`, default `user` |
+| `createdAt` | Date   | Auto-managed by Mongoose timestamps      |
+| `updatedAt` | Date   | Auto-managed by Mongoose timestamps      |
+
+### Collection: `contacts`
+
+Stores contact form submissions.
+
+| Field       | Type   | Constraints                              |
+|-------------|--------|------------------------------------------|
+| `_id`       | ObjectId | Auto-generated primary key             |
+| `name`      | String | Required, minLength 2, maxLength 100     |
+| `email`     | String | Required, lowercase, email format        |
+| `phone`     | String | Required                                 |
+| `message`   | String | Required, minLength 10, maxLength 2000   |
+| `createdAt` | Date   | Auto-managed                             |
+
+### Collection: `newsletters`
+
+Stores newsletter subscriber emails.
+
+| Field          | Type   | Constraints                           |
+|----------------|--------|---------------------------------------|
+| `_id`          | ObjectId | Auto-generated primary key          |
+| `email`        | String | Required, unique, lowercase, email format |
+| `subscribedAt` | Date   | Defaults to `Date.now`               |
+
+---
+
+## Database Relationships
+
+### Primary Key / Foreign Key Concepts
+
+MongoDB uses **`_id` (ObjectId)** as the primary identifier for every document. This corresponds conceptually to the primary key in relational databases.
+
+If relationships are implemented between collections, Mongoose references are used:
+
+```js
+// Example: a Contact referencing a User (one-to-many)
+user: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref : 'User'
+}
+```
+
+### Relationship Types Explained
+
+#### One-to-One
+One User → One UserProfile  
+*Example: a user's profile details stored in a separate collection linked by `user: ObjectId`.*
+
+#### One-to-Many
+One User → Many Orders / Contact Records  
+*Example: one user account submitting multiple contact forms.*
+
+#### Many-to-Many
+Many Students ↔ Many Courses  
+*Example: implemented via an intermediary "enrollments" collection.*
+
+**For NovaMind AI**, contacts and newsletter subscriptions are independent collections. No explicit foreign-key references are enforced — each submission stands alone. If authentication is expanded in a future project, contacts could reference a `User._id`.
+
+---
+
+## Security: Input Safety & Query Security
+
+The MongoDB/Mongoose stack is designed to prevent the class of vulnerability equivalent to SQL injection:
+
+1. **Mongoose model methods only** — All database operations use Mongoose methods (`User.find()`, `User.findById()`, `User.findByIdAndUpdate()`, etc.). Raw MongoDB query strings are never constructed by concatenating user input.
+
+2. **Input treated as data, not executable logic** — User-supplied values (name, email, message, id) are passed as typed JavaScript values to Mongoose, which serialises them safely to BSON. They cannot modify query structure.
+
+3. **ObjectId validation before queries** — `mongoose.Types.ObjectId.isValid(id)` is called before every `findById` or `findByIdAndUpdate`. An invalid ID is rejected with 400 before any database operation.
+
+4. **Mass-assignment prevention** — Controllers extract only the specific fields they allow (`{ name, email, role } = req.body`), ignoring unknown keys. Clients cannot inject extra fields like `__v`, `_id`, or `createdAt`.
+
+5. **Schema-level validation** — Mongoose `required`, `enum`, `match`, `minlength`, and `maxlength` validators reject malformed data before it reaches the database.
+
+6. **No credentials in source code** — The MongoDB connection URI is read exclusively from the `.env` file via `dotenv`. The `.env` file is excluded from version control via `.gitignore`.
+
+---
+
+## Installation
+
+### Prerequisites
+
 - Node.js v16 or higher → https://nodejs.org/
-- npm (comes bundled with Node.js)
+- MongoDB Atlas account (free tier) → https://cloud.mongodb.com  
+  OR locally installed MongoDB → https://www.mongodb.com/try/download/community
 
-Verify installation:
-```bash
-node --version
-npm --version
-```
-
-### 2. Navigate to the Backend Directory
+### 1. Navigate to the Backend Directory
 
 ```bash
 cd "NovaMind AI/backend"
 ```
 
-### 3. Install Dependencies
+### 2. Install Dependencies
 
 ```bash
 npm install
 ```
 
-This installs: **express**, **cors**, **nodemon** (dev)
+This installs: **express**, **mongoose**, **dotenv**, **cors**, **nodemon** (dev)
+
+---
+
+## Environment Setup
+
+### 1. Create your `.env` file
+
+```bash
+# In the backend/ directory:
+cp .env.example .env
+```
+
+Or manually create `backend/.env` with the following content:
+
+```env
+PORT=3000
+MONGODB_URI=your_mongodb_connection_string
+NODE_ENV=development
+```
+
+### 2. Get your MongoDB URI
+
+**MongoDB Atlas (recommended — free tier):**
+1. Create a free cluster at https://cloud.mongodb.com
+2. Database Access → Add Database User (username + password)
+3. Network Access → Allow access from `0.0.0.0/0` (or your IP)
+4. Clusters → Connect → Drivers → Copy connection string
+5. Replace `<username>`, `<password>`, and `<dbname>` in the URI
+
+Example URI:
+```
+MONGODB_URI=mongodb+srv://username:password@cluster0.abc123.mongodb.net/novamind_ai?retryWrites=true&w=majority
+```
+
+**Local MongoDB:**
+```
+MONGODB_URI=mongodb://localhost:27017/novamind_ai
+```
 
 ---
 
@@ -113,52 +272,59 @@ or:
 node server.js
 ```
 
-Server starts on: **http://localhost:3000**
+**Expected console output:**
 
-Console output:
 ```
-═══════════════════════════════════════════════
-  NovaMind AI Backend — Project 2
-  DecodeLabs Industrial Training 2026
 ───────────────────────────────────────────────
-  Server  : http://localhost:3000
-  API     : http://localhost:3000/api
-  Health  : http://localhost:3000/api/health
-  Users   : http://localhost:3000/api/users
+  ✅ MongoDB Connected Successfully
+  Database : novamind_ai
+───────────────────────────────────────────────
+═══════════════════════════════════════════════
+  NovaMind AI Backend — Project 3
+  Database Integration | DecodeLabs 2026
+───────────────────────────────────────────────
+  Server   : http://localhost:3000
+  API      : http://localhost:3000/api
+  Health   : http://localhost:3000/api/health
+  Users    : http://localhost:3000/api/users
+  Database : MongoDB (Mongoose)
 ═══════════════════════════════════════════════
 ```
 
-Then open your browser and go to: **http://localhost:3000**  
+Then open: **http://localhost:3000**  
 This serves the NovaMind AI frontend automatically.
 
 ---
 
-## API Base URL
+## CRUD API Documentation
+
+### CRUD Operation Mapping
 
 ```
-http://localhost:3000/api
+CREATE → POST   /api/users       → MongoDB: User.create()
+READ   → GET    /api/users       → MongoDB: User.find()
+READ   → GET    /api/users/:id   → MongoDB: User.findById()
+UPDATE → PUT    /api/users/:id   → MongoDB: User.findByIdAndUpdate()
+DELETE → DELETE /api/users/:id   → MongoDB: User.findByIdAndDelete()
 ```
-
----
-
-## API Endpoints
 
 ---
 
 ### GET /api/health
-**Purpose:** Health check — confirms the server is running.  
-**HTTP Method:** GET  
+**Purpose:** Health check — server + database status  
+**Method:** GET  
 **URL:** `http://localhost:3000/api/health`  
-**Request Body:** None  
-**Success Status:** 200 OK
+**Success Status:** 200 OK (connected) | 503 Service Unavailable (DB down)
 
-Success Response:
 ```json
 {
   "success": true,
-  "message": "NovaMind AI API is running",
-  "project": "NovaMind AI Backend",
-  "version": "2.0.0",
+  "message": "NovaMind AI API is running and database is connected.",
+  "version": "3.0.0",
+  "database": {
+    "status": "connected",
+    "name": "novamind_ai"
+  },
   "timestamp": "2026-07-29T01:00:00.000Z"
 }
 ```
@@ -166,23 +332,22 @@ Success Response:
 ---
 
 ### GET /api/users
-**Purpose:** Retrieve all registered users.  
-**HTTP Method:** GET  
-**URL:** `http://localhost:3000/api/users`  
-**Request Body:** None  
+**Purpose:** Retrieve all users from MongoDB  
+**Method:** GET  
 **Success Status:** 200 OK
 
-Success Response:
 ```json
 {
   "success": true,
-  "count": 2,
+  "count": 1,
   "data": [
     {
-      "id": 1,
+      "id": "64a1f2b3c4d5e6f7a8b9c0d1",
       "name": "Aisha",
       "email": "aisha@example.com",
-      "createdAt": "2026-07-29T01:00:00.000Z"
+      "role": "user",
+      "createdAt": "2026-07-29T01:00:00.000Z",
+      "updatedAt": "2026-07-29T01:00:00.000Z"
     }
   ]
 }
@@ -191,73 +356,84 @@ Success Response:
 ---
 
 ### POST /api/users
-**Purpose:** Register a new user.  
-**HTTP Method:** POST  
-**URL:** `http://localhost:3000/api/users`  
+**Purpose:** Create a new user (persisted to MongoDB)  
+**Method:** POST  
 **Request Body:**
 ```json
 {
   "name": "Aisha",
-  "email": "aisha@example.com"
+  "email": "aisha@example.com",
+  "role": "user"
 }
 ```
 **Success Status:** 201 Created  
-**Error Status:** 400 Bad Request
+**Error Status:** 400 Bad Request | 409 Conflict
 
-Success Response (201):
+Success (201):
 ```json
 {
   "success": true,
   "message": "User created successfully.",
   "data": {
-    "id": 1,
+    "id": "64a1f2b3c4d5e6f7a8b9c0d1",
     "name": "Aisha",
     "email": "aisha@example.com",
+    "role": "user",
     "createdAt": "2026-07-29T01:00:00.000Z"
   }
 }
 ```
 
-Validation Error Response (400):
+Duplicate Email (409):
 ```json
 {
   "success": false,
-  "message": "Name is required and must be a non-empty string."
+  "message": "A record with this email already exists."
 }
 ```
 
-Duplicate Email Response (400):
+Validation Error (400):
 ```json
 {
   "success": false,
-  "message": "Email already exists. Please use a different email address."
+  "message": "Validation failed. Please check the submitted data.",
+  "errors": {
+    "name": "Name is required."
+  }
 }
 ```
 
 ---
 
 ### GET /api/users/:id
-**Purpose:** Retrieve a single user by their ID.  
-**HTTP Method:** GET  
-**URL:** `http://localhost:3000/api/users/1`  
-**Request Body:** None  
+**Purpose:** Retrieve one user by MongoDB ObjectId  
+**Method:** GET  
+**URL:** `http://localhost:3000/api/users/64a1f2b3c4d5e6f7a8b9c0d1`  
 **Success Status:** 200 OK  
-**Error Status:** 404 Not Found
+**Error Status:** 400 (invalid ID) | 404 Not Found
 
-Success Response (200):
+Success (200):
 ```json
 {
   "success": true,
   "data": {
-    "id": 1,
+    "id": "64a1f2b3c4d5e6f7a8b9c0d1",
     "name": "Aisha",
     "email": "aisha@example.com",
-    "createdAt": "2026-07-29T01:00:00.000Z"
+    "role": "user"
   }
 }
 ```
 
-Not Found Response (404):
+Invalid ID (400):
+```json
+{
+  "success": false,
+  "message": "Invalid user ID format. Please provide a valid MongoDB ObjectId."
+}
+```
+
+Not Found (404):
 ```json
 {
   "success": false,
@@ -267,10 +443,55 @@ Not Found Response (404):
 
 ---
 
+### PUT /api/users/:id
+**Purpose:** Update an existing user  
+**Method:** PUT  
+**Request Body (all fields optional):**
+```json
+{
+  "name": "Aisha Updated",
+  "role": "admin"
+}
+```
+**Success Status:** 200 OK  
+**Error Status:** 400 | 404 | 409
+
+Success (200):
+```json
+{
+  "success": true,
+  "message": "User updated successfully.",
+  "data": {
+    "id": "64a1f2b3c4d5e6f7a8b9c0d1",
+    "name": "Aisha Updated",
+    "email": "aisha@example.com",
+    "role": "admin"
+  }
+}
+```
+
+---
+
+### DELETE /api/users/:id
+**Purpose:** Delete a user from MongoDB  
+**Method:** DELETE  
+**Success Status:** 200 OK  
+**Error Status:** 400 | 404
+
+Success (200):
+```json
+{
+  "success": true,
+  "message": "User deleted successfully.",
+  "data": { "id": "64a1f2b3c4d5e6f7a8b9c0d1" }
+}
+```
+
+---
+
 ### POST /api/contact
-**Purpose:** Submit the contact form.  
-**HTTP Method:** POST  
-**URL:** `http://localhost:3000/api/contact`  
+**Purpose:** Submit the contact form (stored in MongoDB)  
+**Method:** POST  
 **Request Body:**
 ```json
 {
@@ -280,46 +501,39 @@ Not Found Response (404):
   "message": "I need an AI solution for my business."
 }
 ```
-**Success Status:** 201 Created  
-**Error Status:** 400 Bad Request
+**Success Status:** 201 Created | **Error Status:** 400
 
 ---
 
 ### GET /api/contact
-**Purpose:** Retrieve all submitted contact messages.  
-**HTTP Method:** GET  
-**URL:** `http://localhost:3000/api/contact`  
+**Purpose:** Retrieve all contact submissions from MongoDB  
+**Method:** GET  
 **Success Status:** 200 OK
 
 ---
 
 ### POST /api/newsletter
-**Purpose:** Subscribe an email to the newsletter.  
-**HTTP Method:** POST  
-**URL:** `http://localhost:3000/api/newsletter`  
+**Purpose:** Subscribe an email (stored in MongoDB with unique constraint)  
+**Method:** POST  
 **Request Body:**
 ```json
-{
-  "email": "subscriber@example.com"
-}
+{ "email": "subscriber@example.com" }
 ```
 **Success Status:** 201 Created  
-**Error Status:** 400 Bad Request | 409 Conflict (duplicate)
+**Error Status:** 400 | 409 (duplicate)
 
 ---
 
 ### GET /api/newsletter
-**Purpose:** Retrieve all newsletter subscribers.  
-**HTTP Method:** GET  
-**URL:** `http://localhost:3000/api/newsletter`  
+**Purpose:** Retrieve all subscribers from MongoDB  
+**Method:** GET  
 **Success Status:** 200 OK
 
 ---
 
 ### POST /api/login
-**Purpose:** Authenticate a user with email and password.  
-**HTTP Method:** POST  
-**URL:** `http://localhost:3000/api/login`  
+**Purpose:** Authenticate a user (demo credentials — unchanged from Project 2)  
+**Method:** POST  
 **Request Body:**
 ```json
 {
@@ -327,245 +541,188 @@ Not Found Response (404):
   "password": "admin123"
 }
 ```
-**Success Status:** 200 OK  
-**Error Status:** 400 Bad Request | 401 Unauthorized
 
 Demo Credentials:
 
-| Email                | Password  | Role  |
-|----------------------|-----------|-------|
-| admin@novamind.ai    | admin123  | admin |
-| demo@novamind.ai     | demo1234  | user  |
+| Email             | Password  | Role  |
+|-------------------|-----------|-------|
+| admin@novamind.ai | admin123  | admin |
+| demo@novamind.ai  | demo1234  | user  |
 
 ---
 
-## HTTP Status Codes Used
+## HTTP Status Codes
 
-| Code | Meaning               | When Used                                  |
-|------|-----------------------|--------------------------------------------|
-| 200  | OK                    | Successful GET requests                    |
-| 201  | Created               | Successful POST (resource created)         |
-| 400  | Bad Request           | Invalid or missing input data              |
-| 401  | Unauthorized          | Wrong login credentials                    |
-| 404  | Not Found             | Resource or route does not exist           |
-| 409  | Conflict              | Duplicate email (newsletter)               |
-| 500  | Internal Server Error | Unexpected server-side error               |
-
----
-
-## JSON Response Format
-
-All responses follow a consistent structure:
-
-**Success:**
-```json
-{
-  "success": true,
-  "message": "Operation successful",
-  "data": {}
-}
-```
-
-**Error:**
-```json
-{
-  "success": false,
-  "message": "Something went wrong"
-}
-```
+| Code | Meaning               | When Used                                         |
+|------|-----------------------|---------------------------------------------------|
+| 200  | OK                    | Successful GET or DELETE                          |
+| 201  | Created               | Successful POST (resource created in MongoDB)     |
+| 400  | Bad Request           | Invalid input, missing fields, bad ObjectId       |
+| 401  | Unauthorized          | Wrong login credentials                           |
+| 404  | Not Found             | Resource or route does not exist                  |
+| 409  | Conflict              | Duplicate email (unique constraint violation)     |
+| 500  | Internal Server Error | Unexpected server-side error                      |
+| 503  | Service Unavailable   | Database not connected                            |
 
 ---
 
-## Data Validation Rules
+## Database Testing Guide
 
-| Field              | Rule                                                    |
-|--------------------|---------------------------------------------------------|
-| user.name          | Required, non-empty string                              |
-| user.email         | Required, valid email format, must be unique            |
-| contact.name       | Required, non-empty string                              |
-| contact.email      | Required, valid email format                            |
-| contact.phone      | Required, valid phone format (e.g. +92 300 1234567)     |
-| contact.message    | Required, non-empty string                              |
-| newsletter.email   | Required, valid format, must be unique                  |
-| login.email        | Required, valid email format                            |
-| login.password     | Required, non-empty string                              |
-
----
-
-## Frontend → Backend Integration
-
-The frontend `js/main.js` connects to this backend using the `fetch()` API:
-
-```javascript
-const API_BASE = 'http://localhost:3000';
-
-// Contact Form → POST /api/contact
-fetch(`${API_BASE}/api/contact`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ name, email, phone, message })
-});
-
-// Newsletter Form → POST /api/newsletter
-fetch(`${API_BASE}/api/newsletter`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email })
-});
-```
-
-> **IMPORTANT:** Start the backend server BEFORE opening the frontend.  
-> Then navigate to http://localhost:3000 to view the full-stack application.
-
----
-
-## API Testing Guide
-
-### Test 1 — Health Check (200)
+### Test 1 — Health Check (200, DB connected)
 ```
 GET http://localhost:3000/api/health
-Expected: 200 OK
+Expected: 200 OK — "database.status": "connected"
 ```
 
-### Test 2 — Get All Users (200)
-```
-GET http://localhost:3000/api/users
-Expected: 200 OK, data: []
-```
-
-### Test 3 — Create Valid User (201)
+### Test 2 — Create User (201)
 ```
 POST http://localhost:3000/api/users
 Content-Type: application/json
 
-{ "name": "Aisha", "email": "aisha@example.com" }
+{ "name": "Aisha", "email": "aisha@example.com", "role": "user" }
 
 Expected: 201 Created
 ```
 
-### Test 4 — Invalid Data (400)
+### Test 3 — Get All Users (200, from MongoDB)
 ```
-POST http://localhost:3000/api/users
+GET http://localhost:3000/api/users
+Expected: 200 OK — data array contains the created user
+```
+
+### Test 4 — Get User by ID (200)
+```
+GET http://localhost:3000/api/users/<id from Test 2>
+Expected: 200 OK
+```
+
+### Test 5 — Update User (200)
+```
+PUT http://localhost:3000/api/users/<id>
 Content-Type: application/json
 
-{ "name": "", "email": "" }
+{ "name": "Aisha Updated", "role": "admin" }
+
+Expected: 200 OK — updated fields reflected
+```
+
+### Test 6 — Delete User (200)
+```
+DELETE http://localhost:3000/api/users/<id>
+Expected: 200 OK — "User deleted successfully."
+```
+
+### Test 7 — Invalid ID (400)
+```
+GET http://localhost:3000/api/users/not-a-real-id
+Expected: 400 Bad Request — "Invalid user ID format"
+```
+
+### Test 8 — Non-existent User (404)
+```
+GET http://localhost:3000/api/users/000000000000000000000000
+Expected: 404 Not Found
+```
+
+### Test 9 — Duplicate Email (409)
+```
+POST http://localhost:3000/api/users
+{ "name": "Another", "email": "aisha@example.com" }
+(same email as Test 2 — after deleting, re-create first)
+
+Expected: 409 Conflict — "A record with this email already exists."
+```
+
+### Test 10 — Invalid Data (400)
+```
+POST http://localhost:3000/api/users
+{ "name": "", "email": "not-an-email" }
 
 Expected: 400 Bad Request
 ```
 
-### Test 5 — Duplicate Email (400)
+### Test 11 — Restart Persistence (Proves MongoDB)
 ```
-POST http://localhost:3000/api/users
-Content-Type: application/json
+1. POST /api/users  → create a user
+2. Restart node server.js
+3. GET  /api/users  → user still exists (MongoDB persisted it)
 
-{ "name": "Someone", "email": "aisha@example.com" }
-
-Expected: 400 Bad Request — "Email already exists"
-```
-
-### Test 6 — Get Existing User (200)
-```
-GET http://localhost:3000/api/users/1
-Expected: 200 OK
+Expected: User is still present after restart
 ```
 
-### Test 7 — Get Nonexistent User (404)
-```
-GET http://localhost:3000/api/users/999
-Expected: 404 Not Found
-```
-
-### Test 8 — Unknown API Route (404)
-```
-GET http://localhost:3000/api/unknown
-Expected: 404 Not Found — JSON with availableEndpoints list
-```
-
-### Test 9 — Submit Contact Form (201)
+### Test 12 — Contact Form (201)
 ```
 POST http://localhost:3000/api/contact
-Content-Type: application/json
-
 {
   "name": "Zeeshan",
   "email": "zeeshan@example.com",
   "phone": "+92 300 1234567",
   "message": "I want AI for my business."
 }
-
 Expected: 201 Created
 ```
 
-### Test 10 — Subscribe Newsletter (201)
+### Test 13 — Newsletter Duplicate (409)
 ```
-POST http://localhost:3000/api/newsletter
-Content-Type: application/json
-
-{ "email": "newsletter@example.com" }
-
-Expected: 201 Created
+POST http://localhost:3000/api/newsletter  (twice, same email)
+Expected first: 201 Created
+Expected second: 409 Conflict
 ```
-
-### Test 11 — Duplicate Newsletter (409)
-```
-POST http://localhost:3000/api/newsletter
-Content-Type: application/json
-
-{ "email": "newsletter@example.com" }
-
-Expected: 409 Conflict
-```
-
----
-
-## npm Commands Reference
-
-| Command        | Description                                       |
-|----------------|---------------------------------------------------|
-| `npm install`  | Install all dependencies from package.json        |
-| `npm start`    | Start the server in production mode               |
-| `npm run dev`  | Start with Nodemon (auto-restarts on file save)   |
 
 ---
 
 ## Architecture Overview
 
 ```
-Request
-   │
-   ├─ CORS Middleware
-   ├─ express.json()    — parse JSON request body
-   ├─ requestLogger     — log method, URL, status, time
-   │
-   ├─ GET  /api/health  → 200 OK (inline)
-   ├─ GET  /api         → route index (inline)
-   │
-   ├─ /api/users        → userRoutes → userController → userModel
-   ├─ /api/contact      → contactRoutes → contactController → contactModel
-   ├─ /api/newsletter   → newsletterRoutes → newsletterController → newsletterModel
-   ├─ /api/login        → authRoutes → authController → authModel
-   │
-   ├─ notFoundHandler   → 404 JSON for unknown routes
-   └─ errorHandler      → 500 JSON for unhandled errors
+Frontend (index.html + js/main.js)
+     │  fetch('/api/contact')
+     │  fetch('/api/newsletter')
+     ▼
+Express HTTP Server (server.js)
+     │
+     ├─ CORS Middleware         — allows PUT & DELETE from all origins
+     ├─ express.json()          — parse JSON request body
+     ├─ requestLogger           — log method, URL, status, time
+     │
+     ├─ GET  /api/health        → MongoDB status check
+     ├─ GET  /api               → endpoint directory
+     │
+     ├─ /api/users              → userRoutes
+     │       │                       ├─ GET    /       → getUsers()
+     │       │                       ├─ POST   /       → createUser()
+     │       │                       ├─ GET    /:id    → getUserById()
+     │       │                       ├─ PUT    /:id    → updateUser()
+     │       │                       └─ DELETE /:id    → deleteUser()
+     │       ▼
+     │   userController (async)
+     │       ▼
+     │   User (Mongoose Model)
+     │       ▼
+     │   MongoDB "users" collection
+     │
+     ├─ /api/contact            → contactRoutes → contactController → Contact model → MongoDB
+     ├─ /api/newsletter         → newsletterRoutes → newsletterController → Newsletter model → MongoDB
+     ├─ /api/login              → authRoutes → authController → demo credentials
+     │
+     ├─ notFoundHandler         → 404 JSON for unknown routes
+     └─ errorHandler            → Mongoose ValidationError / CastError / 11000 / 500
 ```
 
 ---
 
-## Upgrade Paths (Production Readiness)
+## npm Commands Reference
 
-| Feature            | Current (Demo)         | Production Upgrade               |
-|--------------------|------------------------|----------------------------------|
-| Data Storage       | In-memory arrays       | MongoDB / PostgreSQL with ORM    |
-| Authentication     | Dummy credentials      | JWT + bcrypt password hashing    |
-| Input Sanitisation | Basic regex validation | express-validator / joi          |
-| Environment Config | Hardcoded values       | dotenv + .env file               |
-| Rate Limiting      | None                   | express-rate-limit               |
-| API Documentation  | README                 | Swagger / OpenAPI 3.0            |
+| Command        | Description                                        |
+|----------------|----------------------------------------------------|
+| `npm install`  | Install all dependencies from package.json         |
+| `npm start`    | Start the server (production)                      |
+| `npm run dev`  | Start with Nodemon (auto-restarts on file save)    |
 
 ---
 
 Author: NovaMind AI Engineering Team  
-Built for: DecodeLabs Industrial Training | Project 2 — Backend API Development  
-Frontend: NovaMind AI Landing Page (Project 1)
+Built for: DecodeLabs Industrial Training | Project 3 — Database Integration  
+Frontend: NovaMind AI Landing Page (Project 1)  
+Backend API: Project 2 (upgraded in Project 3)
 
 © 2026 NovaMind AI. All rights reserved.

@@ -1,49 +1,53 @@
 /* =============================================================================
    controllers/contactController.js
-   Business logic for the /contact endpoints.
-   Validates input → delegates to model → returns JSON response.
+   Business logic for the /api/contact endpoints.
+   Project 3: Database Integration | DecodeLabs Industrial Training 2026
+
+   Upgraded from Project 2 (in-memory, sync) to MongoDB + Mongoose (async).
+   Contact form submissions are now stored persistently in the database.
+
+   Operations:
+     ✓ POST /api/contact — validates & saves to MongoDB       (201)
+     ✓ GET  /api/contact — retrieves all submissions          (200)
    ============================================================================= */
 
-const { addContact, getAllContacts } = require('../models/contactModel');
+const Contact = require('../models/contactModel');
 
-// ── Utility: email & phone validators ─────────────────────────────────────────
+// ── Utility validators ─────────────────────────────────────────────────────────
 
 /**
- * isValidEmail – checks if a string is a well-formed email address.
+ * isValidEmail – basic email format check.
  * @param {string} email
  * @returns {boolean}
  */
 function isValidEmail(email) {
-  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return re.test(email);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 /**
  * isValidPhone – accepts common international phone formats.
- * Examples: +1 (555) 000-0000, 03001234567, +923001234567
  * @param {string} phone
  * @returns {boolean}
  */
 function isValidPhone(phone) {
-  const re = /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
-  return re.test(phone);
+  return /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/.test(phone);
 }
 
 // ── Controller Methods ─────────────────────────────────────────────────────────
 
-/**
- * submitContact – POST /contact
- * Validates the request body, stores the message, returns JSON.
- *
- * @param {import('express').Request}  req
- * @param {import('express').Response} res
- * @param {Function}                   next  - passes errors to errorHandler
- */
-function submitContact(req, res, next) {
+/* ---------------------------------------------------------------------------
+   POST /api/contact
+   Validates the request body, stores the contact message in MongoDB.
+
+   Success:          201 Created  { success, message, data: contact }
+   Validation error: 400 Bad Req. { success: false, message, errors }
+   --------------------------------------------------------------------------- */
+async function submitContact(req, res, next) {
   try {
     const { name, email, phone, message } = req.body;
 
-    // ── Field-level Validation ──────────────────────────────────────────────
+    // ── Application-level validation ─────────────────────────────────────────
+    // Runs before the DB operation to give clear, field-level error feedback.
     const errors = {};
 
     if (!name || name.trim() === '') {
@@ -55,14 +59,15 @@ function submitContact(req, res, next) {
     }
 
     if (!phone || !isValidPhone(phone)) {
-      errors.phone = 'A valid phone number is required (e.g. +1 555 000 0000).';
+      errors.phone = 'A valid phone number is required (e.g. +92 300 1234567).';
     }
 
     if (!message || message.trim() === '') {
       errors.message = 'Message is required.';
+    } else if (message.trim().length < 10) {
+      errors.message = 'Message must be at least 10 characters long.';
     }
 
-    // Return 400 with field-level error map if validation fails
     if (Object.keys(errors).length > 0) {
       return res.status(400).json({
         success : false,
@@ -71,8 +76,10 @@ function submitContact(req, res, next) {
       });
     }
 
-    // ── Store & Respond ────────────────────────────────────────────────────
-    const saved = addContact({ name, email, phone, message });
+    // ── Persist to MongoDB via Mongoose ──────────────────────────────────────
+    // Contact.create() is equivalent to new Contact(data).save()
+    // Schema-level validators run here as a second defence layer.
+    const saved = await Contact.create({ name, email, phone, message });
 
     return res.status(201).json({
       success : true,
@@ -81,28 +88,27 @@ function submitContact(req, res, next) {
     });
 
   } catch (err) {
-    // Forward unexpected errors to the global error-handling middleware
+    // Mongoose ValidationError handled by errorHandler.js → 400
     next(err);
   }
 }
 
-/**
- * getContacts – GET /contact
- * Returns all stored contact submissions as JSON.
- *
- * @param {import('express').Request}  req
- * @param {import('express').Response} res
- * @param {Function}                   next
- */
-function getContacts(req, res, next) {
+/* ---------------------------------------------------------------------------
+   GET /api/contact
+   Returns all contact submissions from MongoDB, newest first.
+
+   Success: 200 OK  { success, count, data: [ ...contacts ] }
+   --------------------------------------------------------------------------- */
+async function getContacts(req, res, next) {
   try {
-    const all = getAllContacts();
+    const contacts = await Contact.find().sort({ createdAt: -1 });
 
     return res.status(200).json({
       success : true,
-      count   : all.length,
-      data    : all
+      count   : contacts.length,
+      data    : contacts
     });
+
   } catch (err) {
     next(err);
   }

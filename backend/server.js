@@ -1,16 +1,28 @@
 /* =============================================================================
    NovaMind AI Backend — server.js
-   Project 2: Backend API Development | DecodeLabs Industrial Training 2026
+   Project 3: Database Integration | DecodeLabs Industrial Training 2026
 
    Entry point of the Express application.
-   Wires up middleware, mounts /api/ routes, and starts the HTTP server.
+   Project 3 additions over Project 2:
+     ✓ dotenv loaded — reads PORT and MONGODB_URI from backend/.env
+     ✓ connectDB()   — establishes the Mongoose/MongoDB connection before
+                        the HTTP server starts accepting requests
+     ✓ CORS updated  — PUT and DELETE methods are now allowed
+     ✓ Health check  — reports database connection status
 
    API Base URL: http://localhost:3000/api
    ============================================================================= */
 
+// ── Load environment variables FIRST ──────────────────────────────────────────
+// dotenv must be required before any other module that reads process.env.
+require('dotenv').config();
+
 const express = require('express');
 const cors    = require('cors');
 const path    = require('path');
+
+// ── Database Connection ────────────────────────────────────────────────────────
+const connectDB = require('./config/database');
 
 // ── Route Imports ──────────────────────────────────────────────────────────────
 const userRoutes       = require('./routes/userRoutes');
@@ -30,13 +42,12 @@ const PORT = process.env.PORT || 3000;
 // ── Core Middleware ────────────────────────────────────────────────────────────
 
 /**
- * CORS – allow requests from any origin.
- * This lets the HTML frontend (opened as a file:// or on a different port)
- * communicate freely with the API during development.
+ * CORS – allow all origins during development.
+ * PUT and DELETE are now included to support full CRUD from the frontend.
  */
 app.use(cors({
-  origin      : '*',
-  methods     : ['GET', 'POST', 'OPTIONS'],
+  origin        : '*',
+  methods       : ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
@@ -47,19 +58,19 @@ app.use(cors({
 app.use(express.json());
 
 /**
- * express.urlencoded() – parse URL-encoded form bodies (belt-and-braces).
+ * express.urlencoded() – parse URL-encoded form bodies.
  */
 app.use(express.urlencoded({ extended: true }));
 
 /**
  * Serve the NovaMind AI frontend from the project root directory.
- * With this, opening http://localhost:3000 serves index.html automatically.
+ * Opening http://localhost:3000 serves index.html automatically.
  */
 app.use(express.static(path.join(__dirname, '..')));
 
 /**
  * Custom request logger – logs method, URL, status code & response time.
- * Example output: [2026-07-29] GET /api/health 200 3ms
+ * Example output: [2026-07-29] POST /api/users 201 8ms
  */
 app.use(requestLogger);
 
@@ -67,53 +78,60 @@ app.use(requestLogger);
 
 /**
  * GET /api/health
- * Simple health-check so you can verify the server is running.
- * Useful for testing and deployment checks.
- *
- * Response: 200 OK
- * {
- *   "success": true,
- *   "message": "NovaMind AI API is running"
- * }
+ * Returns server status plus MongoDB connection state.
+ * Mongoose connection states: 0=disconnected, 1=connected, 2=connecting, 3=disconnecting
  */
+const mongoose = require('mongoose');
+
 app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    success   : true,
-    message   : 'NovaMind AI API is running',
+  const dbState   = mongoose.connection.readyState;
+  const dbStatus  = ['disconnected', 'connected', 'connecting', 'disconnecting'][dbState];
+  const dbHealthy = dbState === 1;
+
+  res.status(dbHealthy ? 200 : 503).json({
+    success   : dbHealthy,
+    message   : dbHealthy
+                  ? 'NovaMind AI API is running and database is connected.'
+                  : 'NovaMind AI API is running but database is not connected.',
     project   : 'NovaMind AI Backend',
-    version   : '2.0.0',
+    version   : '3.0.0',
+    database  : {
+      status  : dbStatus,
+      name    : mongoose.connection.name || 'n/a'
+    },
     timestamp : new Date().toISOString()
   });
 });
 
-// ── API Status (root route) ────────────────────────────────────────────────────
+// ── API Root ──────────────────────────────────────────────────────────────────
 
 /**
  * GET /api
- * Root API route — lists all available endpoints.
- * Useful for quick orientation when the API is hit directly.
+ * Lists all available endpoints.
  */
 app.get('/api', (req, res) => {
   res.status(200).json({
     success  : true,
-    message  : 'Welcome to the NovaMind AI RESTful API',
-    version  : '2.0.0',
+    message  : 'Welcome to the NovaMind AI RESTful API — Project 3: Database Integration',
+    version  : '3.0.0',
+    database : 'MongoDB + Mongoose',
     endpoints: {
-      health     : 'GET  /api/health',
-      users      : 'GET  /api/users',
-      createUser : 'POST /api/users',
-      userById   : 'GET  /api/users/:id',
-      contact    : 'GET  /api/contact    |  POST /api/contact',
-      newsletter : 'GET  /api/newsletter |  POST /api/newsletter',
-      login      : 'POST /api/login'
+      health      : 'GET    /api/health',
+      users       : 'GET    /api/users',
+      createUser  : 'POST   /api/users',
+      userById    : 'GET    /api/users/:id',
+      updateUser  : 'PUT    /api/users/:id',
+      deleteUser  : 'DELETE /api/users/:id',
+      contact     : 'GET    /api/contact    |  POST /api/contact',
+      newsletter  : 'GET    /api/newsletter |  POST /api/newsletter',
+      login       : 'POST   /api/login'
     }
   });
 });
 
 // ── Mount Feature Routers under /api/ ─────────────────────────────────────────
-// RESTful convention: resources are nouns, HTTP methods are the verbs.
 
-app.use('/api/users',      userRoutes);       // GET, POST /api/users  |  GET /api/users/:id
+app.use('/api/users',      userRoutes);       // Full CRUD: GET, POST, PUT, DELETE
 app.use('/api/contact',    contactRoutes);    // GET, POST /api/contact
 app.use('/api/newsletter', newsletterRoutes); // GET, POST /api/newsletter
 app.use('/api/login',      authRoutes);       // POST /api/login
@@ -124,17 +142,27 @@ app.use('/api/login',      authRoutes);       // POST /api/login
 app.use(notFoundHandler); // 404 — route not matched → JSON response
 app.use(errorHandler);    // 500 — unhandled errors  → JSON response
 
-// ── Start Server ───────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log('═══════════════════════════════════════════════');
-  console.log('  NovaMind AI Backend — Project 2');
-  console.log('  DecodeLabs Industrial Training 2026');
-  console.log('───────────────────────────────────────────────');
-  console.log(`  Server  : http://localhost:${PORT}`);
-  console.log(`  API     : http://localhost:${PORT}/api`);
-  console.log(`  Health  : http://localhost:${PORT}/api/health`);
-  console.log(`  Users   : http://localhost:${PORT}/api/users`);
-  console.log('═══════════════════════════════════════════════');
-});
+// ── Connect to MongoDB, then start HTTP server ─────────────────────────────────
+// The server does NOT start listening until the database connection succeeds.
+// This prevents the API from serving requests without a working database.
+
+async function startServer() {
+  await connectDB(); // Will exit process if connection fails
+
+  app.listen(PORT, () => {
+    console.log('═══════════════════════════════════════════════');
+    console.log('  NovaMind AI Backend — Project 3');
+    console.log('  Database Integration | DecodeLabs 2026');
+    console.log('───────────────────────────────────────────────');
+    console.log(`  Server   : http://localhost:${PORT}`);
+    console.log(`  API      : http://localhost:${PORT}/api`);
+    console.log(`  Health   : http://localhost:${PORT}/api/health`);
+    console.log(`  Users    : http://localhost:${PORT}/api/users`);
+    console.log('  Database : MongoDB (Mongoose)');
+    console.log('═══════════════════════════════════════════════');
+  });
+}
+
+startServer();
 
 module.exports = app; // Exported for potential future test suites
