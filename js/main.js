@@ -1,6 +1,13 @@
 /* ==========================================================================
    NovaMind AI Landing Page JS Operations
+   Project 1: Frontend  |  Project 2: Connected to NovaMind AI Backend API
+   Backend Base URL: http://localhost:3000/api
    ========================================================================== */
+
+// ── Backend API Base URL ──────────────────────────────────────────────────────
+// Change this if your Node.js server runs on a different port.
+// All API routes are prefixed with /api/ — e.g. http://localhost:3000/api/contact
+const API_BASE = 'http://localhost:3000';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -295,31 +302,55 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (isFormValid) {
-        // Change submit button to loading state
+        // ── Set button to loading state ───────────────────────────────────
         const submitBtn = contactForm.querySelector('button[type="submit"]');
         const originalText = submitBtn.textContent;
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Processing...';
+        submitBtn.textContent = 'Sending...';
 
-        // Simulate API network latency
-        setTimeout(() => {
-          formFeedback.className = 'form-feedback success';
-          formFeedback.textContent = 'Thank you! Your message was delivered successfully. A NovaMind AI architect will call you shortly.';
-          formFeedback.style.display = 'block';
-          
-          // Reset form
-          contactForm.reset();
-          submitBtn.disabled = false;
-          submitBtn.textContent = originalText;
+        // ── Build request payload ─────────────────────────────────────────
+        const payload = {
+          name    : nameInput.value.trim(),
+          email   : emailInput.value.trim(),
+          phone   : phoneInput.value.trim(),
+          message : messageInput.value.trim()
+        };
 
-          // Clear validation states
-          document.querySelectorAll('.form-group').forEach(group => {
-            group.classList.remove('invalid');
+        // ── POST to backend API ───────────────────────────────────────────
+        fetch(`${API_BASE}/api/contact`, {
+          method  : 'POST',
+          headers : { 'Content-Type': 'application/json' },
+          body    : JSON.stringify(payload)
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              // ── Success ──────────────────────────────────────────────
+              formFeedback.className = 'form-feedback success';
+              formFeedback.textContent = data.message;
+              formFeedback.style.display = 'block';
+
+              contactForm.reset();
+              document.querySelectorAll('.form-group').forEach(g => g.classList.remove('invalid'));
+            } else {
+              // ── Validation / Server Error ─────────────────────────────
+              formFeedback.className = 'form-feedback error';
+              formFeedback.textContent = data.message || 'Something went wrong. Please try again.';
+              formFeedback.style.display = 'block';
+            }
+          })
+          .catch(() => {
+            // ── Network / Connection Error ────────────────────────────────
+            formFeedback.className = 'form-feedback error';
+            formFeedback.textContent = 'Unable to reach the server. Please ensure the backend is running on port 3000.';
+            formFeedback.style.display = 'block';
+          })
+          .finally(() => {
+            // Restore button regardless of outcome
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+            formFeedback.scrollIntoView({ behavior: 'smooth', block: 'center' });
           });
-
-          // Scroll feedback into view
-          formFeedback.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 1500);
       }
     });
 
@@ -352,21 +383,54 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       const emailVal = newsletterEmail.value.trim();
 
+      // ── Client-side format check ────────────────────────────────────────
       if (!validateEmail(emailVal)) {
         newsletterForm.classList.add('invalid');
-      } else {
-        newsletterForm.classList.remove('invalid');
-        const originalPlaceholder = newsletterEmail.placeholder;
-        
-        newsletterEmail.value = '';
-        newsletterEmail.placeholder = 'Subscribed Successfully!';
-        newsletterEmail.disabled = true;
-
-        setTimeout(() => {
-          newsletterEmail.placeholder = originalPlaceholder;
-          newsletterEmail.disabled = false;
-        }, 3000);
+        return;
       }
+
+      newsletterForm.classList.remove('invalid');
+
+      // Disable input while request is in-flight
+      newsletterEmail.disabled = true;
+      const submitBtn = newsletterForm.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+
+      // ── POST to backend API ─────────────────────────────────────────────
+      fetch(`${API_BASE}/api/newsletter`, {
+        method  : 'POST',
+        headers : { 'Content-Type': 'application/json' },
+        body    : JSON.stringify({ email: emailVal })
+      })
+        .then(res => res.json())
+        .then(data => {
+          const originalPlaceholder = newsletterEmail.placeholder;
+          if (data.success) {
+            // ── Subscribed successfully ───────────────────────────────
+            newsletterEmail.value = '';
+            newsletterEmail.placeholder = '✓ Subscribed Successfully!';
+            setTimeout(() => {
+              newsletterEmail.placeholder = originalPlaceholder;
+            }, 3500);
+          } else {
+            // ── Already subscribed or server validation error ─────────
+            newsletterEmail.placeholder = data.message || 'Already subscribed!';
+            setTimeout(() => {
+              newsletterEmail.placeholder = originalPlaceholder;
+              newsletterEmail.value = '';
+            }, 3500);
+          }
+        })
+        .catch(() => {
+          newsletterEmail.placeholder = '⚠ Server unavailable — start backend on port 3000';
+          setTimeout(() => {
+            newsletterEmail.placeholder = 'Enter your email';
+          }, 3000);
+        })
+        .finally(() => {
+          newsletterEmail.disabled = false;
+          if (submitBtn) submitBtn.disabled = false;
+        });
     });
 
     newsletterEmail.addEventListener('keyup', function() {
